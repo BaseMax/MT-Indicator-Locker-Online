@@ -43,7 +43,7 @@ document.getElementById('licenseForm').addEventListener('submit', function (e) {
         const startDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
         let daysCheck = '';
         if (daysLimit > 0) {
-            daysCheck = `\n   // Days limitation check\n   string startDate = "${startDate}";\n   int daysLimit = ${daysLimit};\n   datetime dtStart;\n   if(StringToTime(startDate, dtStart)) {\n      int daysPassed = (TimeCurrent() - dtStart) / 86400;\n      if(daysPassed > daysLimit) {\n         MessageBox("License expired! Days limit reached.", "License Error", MB_ICONERROR);\n         return INIT_FAILED;\n      }\n   } else {\n      MessageBox("License start date error.", "License Error", MB_ICONERROR);\n      return INIT_FAILED;\n   }`;
+            daysCheck = `\n   // Days limitation check\n   string startDate = "${startDate}";\n   int daysLimit = ${daysLimit};\n\n   datetime dtStart = StringToTime(startDate);  // صحیح: یک پارامتر، مقدار برمی‌گرداند\n   if(dtStart == 0)  // اگر تبدیل ناموفق بود (تاریخ نامعتبر)\n   {\n      MessageBox("License start date error.", "License Error", MB_ICONERROR);\n      return INIT_FAILED;\n   }\n\n   long daysPassed = (TimeCurrent() - dtStart) / 86400;  // long برای جلوگیری از overflow\n   if(daysPassed > daysLimit)\n   {\n      MessageBox("License expired! Days limit reached.", "License Error", MB_ICONERROR);\n      return INIT_FAILED;\n   }`;
         }
 
         const licenseBlock =
