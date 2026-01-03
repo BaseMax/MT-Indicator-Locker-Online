@@ -26,6 +26,8 @@
         <p style="margin-bottom:18px;font-size:15px;">Lock and protect your MetaTrader 5 (MT5) indicator with a SHA256 license key.<br>Open source on <a href="https://github.com/BaseMax/MT-Indicator-Locker-Online" target="_blank" rel="noopener">GitHub</a>.</p>
         <h2>Enter Your License Key</h2>
         <form id="licenseForm">
+            <input type="text" id="prefix" placeholder="Prefix (e.g. indicator name)" maxlength="32" style="margin-bottom:8px;" required />
+            <input type="number" id="daysLimit" placeholder="Days Limit (0=unlimited)" min="0" style="margin-bottom:8px;" required />
             <input type="text" id="licenseKey" placeholder="Paste your SHA256 license key here" maxlength="64" required />
             <textarea id="indicatorCode" placeholder="Paste your Indicator.mq5 code here" rows="16" style="width:100%;margin:16px 0 8px 0;"></textarea>
             <button type="submit">Apply License</button>
