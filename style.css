@@ -123,7 +123,7 @@ p {
     position: relative;
 }
 
-input[type="text"], textarea {
+select, input[type="text"], input[type="number"], textarea {
     width: 100%;
     padding: 13px 14px;
     margin-bottom: 16px;
@@ -138,7 +138,7 @@ input[type="text"], textarea {
     font-family: inherit;
 }
 
-input[type="text"]:focus, textarea:focus {
+select, input[type="text"]:focus, input[type="number"]:focus, textarea:focus {
     border: 1.5px solid #6366f1;
     box-shadow: 0 0 0 2px #a5b4fc44;
 }
