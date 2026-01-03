@@ -27,8 +27,8 @@ document.getElementById('licenseForm').addEventListener('submit', function (e) {
         errorDiv.textContent = 'License key cannot be empty.';
         return;
     }
-    if (!/^[a-fA-F0-9]{64}$/.test(key)) {
-        errorDiv.textContent = 'License key must be a 64-character SHA256 hex string.';
+    if (!/^[a-fA-F0-9]{64,}$/.test(key)) {
+        errorDiv.textContent = 'License key must be over 64-character SHA256 hex string.';
         return;
     }
     if (!code.trim()) {
