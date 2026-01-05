@@ -93,8 +93,7 @@ $('applyBtn').addEventListener('click', () => {
    // LICENSE CHECK (injected by Max Online Locker Tool)
    string raw = "${prefix}" + GetMachineID();
    string hash = SHA256_hex_from_string(raw);
-   if(hash != "${key}")
-   {
+   if(hash != "${key}") {
       Comment("License not yet valid.");
       Alert("License not yet valid.");
       MessageBox("License not yet valid.", "License Error", MB_ICONERROR);
@@ -103,8 +102,8 @@ $('applyBtn').addEventListener('click', () => {
 
    string licenseStart = "${today}";
    long totalSeconds = ${totalSeconds};
-
    datetime now = GetServerTime();
+   
    if(now < StringToTime(licenseStart)) {
       Comment("License expired.");
       Alert("License expired.");
