@@ -56,7 +56,7 @@ document.getElementById('licenseForm').addEventListener('submit', function (e) {
         return;
     }
 
-    if (!/^[a-fA-F0-9]{64,}$/.test(key)) {
+    if (!/^[a-fA-F0-9]{64}$/.test(key)) {
         errorDiv.textContent = 'License key must be a valid SHA256 hex string.';
         return;
     }
