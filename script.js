@@ -91,7 +91,7 @@ document.getElementById('licenseForm').addEventListener('submit', function (e) {
       return INIT_FAILED;
    }
 
-   datetime now = TimeCurrent();
+   datetime now = GetServerTime();
 
    if(now < dtStart)
    {
@@ -154,6 +154,14 @@ string GetMachineID()
    s += "DATA:" + TerminalInfoString(TERMINAL_DATA_PATH) + ";";
    s += "COMMON:" + TerminalInfoString(TERMINAL_COMMONDATA_PATH) + ";";
    return s;
+}
+
+datetime GetServerTime()
+{
+   datetime t = TimeTradeServer();
+   if(t <= 0)
+      t = TimeCurrent();
+   return t;
 }
 `;
 
