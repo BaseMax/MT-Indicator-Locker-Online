@@ -2,67 +2,166 @@ document.getElementById('licenseForm').addEventListener('submit', function (e) {
     e.preventDefault();
 
     const prefix = document.getElementById('prefix').value.trim();
-    const daysLimitInput = document.getElementById('daysLimit').value.trim();
+    const daysRaw = document.getElementById('daysLimit').value.trim();
+    const minutesRaw = document.getElementById('minutesLimit').value.trim();
     const key = document.getElementById('licenseKey').value.trim();
     const codeArea = document.getElementById('indicatorCode');
     const errorDiv = document.getElementById('error');
     const code = codeArea.value;
+
     errorDiv.textContent = '';
 
-    const daysLimit = daysLimitInput === '' ? 0 : parseInt(daysLimitInput, 10);
+    const days = daysRaw === '' ? 30 : parseInt(daysRaw, 10);
+    const minutes = minutesRaw === '' ? 0 : parseInt(minutesRaw, 10);
 
     localStorage.setItem('indicatorCode', code);
     localStorage.setItem('prefix', prefix);
-    localStorage.setItem('daysLimit', isNaN(daysLimit) ? '' : daysLimit);
+    localStorage.setItem('daysLimit', days);
+    localStorage.setItem('minutesLimit', minutes);
 
     if (!prefix) {
         errorDiv.textContent = 'Prefix cannot be empty.';
         return;
     }
-    if (isNaN(daysLimit) || daysLimit < 0) {
-        errorDiv.textContent = 'Days limit must be 0 or a positive integer.';
+
+    if (isNaN(days) || isNaN(minutes)) {
+        errorDiv.textContent = 'Days and minutes must be valid integers.';
         return;
     }
+
+    if (days < 0) {
+        errorDiv.textContent = 'Days cannot be negative.';
+        return;
+    }
+
+    if (days === 0 && minutes === 0) {
+        errorDiv.textContent = 'Days and minutes cannot both be zero.';
+        return;
+    }
+
+    if (days === 0 && minutes < 0) {
+        errorDiv.textContent = 'Minutes cannot be negative when days is zero.';
+        return;
+    }
+
+    const totalSeconds = (days * 86400) + (minutes * 60);
+
+    if (totalSeconds <= 0) {
+        errorDiv.textContent = 'Total license duration must be greater than zero.';
+        return;
+    }
+
     if (!key) {
         errorDiv.textContent = 'License key cannot be empty.';
         return;
     }
+
     if (!/^[a-fA-F0-9]{64,}$/.test(key)) {
-        errorDiv.textContent = 'License key must be over 64-character SHA256 hex string.';
+        errorDiv.textContent = 'License key must be a valid SHA256 hex string.';
         return;
     }
+
     if (!code.trim()) {
         errorDiv.textContent = 'Indicator code cannot be empty.';
         return;
     }
 
     try {
-        const marker = /\/\/\/\/ \/\/\/\/ \/\/\/\/ \/\/\/\/ \/\/\/\/ MAXLICENSE \/\/\/\/ \/\/\/\/ \/\/\/\/ \/\/\/\//;
-
-        const today = new Date();
-        const startDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-        let daysCheck = '';
-        if (daysLimit > 0) {
-            daysCheck = `\n   // Days limitation check\n   string startDate = "${startDate}";\n   int daysLimit = ${daysLimit};\n\n   datetime dtStart = StringToTime(startDate);  // صحیح: یک پارامتر، مقدار برمی‌گرداند\n   if(dtStart == 0)  // اگر تبدیل ناموفق بود (تاریخ نامعتبر)\n   {\n      MessageBox("License start date error.", "License Error", MB_ICONERROR);\n      return INIT_FAILED;\n   }\n\n   long daysPassed = (TimeCurrent() - dtStart) / 86400;  // long برای جلوگیری از overflow\n   if(daysPassed > daysLimit)\n   {\n      MessageBox("License expired! Days limit reached.", "License Error", MB_ICONERROR);\n      return INIT_FAILED;\n   }`;
-        }
-
-        const licenseBlock =
-            `   // LICENSE CHECK (injected by Max Online Locker Tool)\n   string raw = "${prefix}" + GetMachineID();\n   string hash = SHA256_hex_from_string(raw);\n   if(hash != "${key}")\n   {\n      MessageBox(\"License key is invalid for this machine!\", \"License Error\", MB_ICONERROR);\n      return INIT_FAILED;\n   }${daysCheck}`;
+        const marker =
+            /\/\/\/\/ \/\/\/\/ \/\/\/\/ \/\/\/\/ \/\/\/\/ MAXLICENSE \/\/\/\/ \/\/\/\/ \/\/\/\/ \/\/\/\//;
 
         if (!marker.test(code)) {
             errorDiv.textContent = 'License marker not found in indicator code.';
             return;
         }
+
+        const today = new Date();
+        const startDate =
+            `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+        const timeCheck = `
+   // TIME LIMIT CHECK
+   string licenseStart = "${startDate}";
+   long totalSeconds = ${totalSeconds};
+
+   datetime dtStart = StringToTime(licenseStart);
+   if(dtStart == 0)
+   {
+      MessageBox("License start date error.", "License Error", MB_ICONERROR);
+      return INIT_FAILED;
+   }
+
+   datetime now = TimeCurrent();
+
+   if(now < dtStart)
+   {
+      MessageBox("License not yet valid.", "License Error", MB_ICONERROR);
+      return INIT_FAILED;
+   }
+
+   if(now > dtStart + totalSeconds)
+   {
+      MessageBox("License expired.", "License Error", MB_ICONERROR);
+      return INIT_FAILED;
+   }`;
+
+        const licenseBlock = `
+   // LICENSE CHECK (injected by Max Online Locker Tool)
+   string raw = "${prefix}" + GetMachineID();
+   string hash = SHA256_hex_from_string(raw);
+   if(hash != "${key}")
+   {
+      MessageBox("License key is invalid for this machine!", "License Error", MB_ICONERROR);
+      return INIT_FAILED;
+   }${timeCheck}
+`;
+
         let patched = code.replace(marker, licenseBlock);
 
-        const helpers =
-`string CharArrayToHex(const uchar &arr[])\n{\n   string out = "";\n   int n = ArraySize(arr);\n   for(int i=0; i<n; i++)\n      out += StringFormat("%02X", arr[i]);\n   return out;\n}\n\nstring SHA256_hex_from_string(const string s)\n{\n   uchar src[];\n   uchar key[];\n   uchar res[];\n\n   int src_len = StringToCharArray(s, src);\n   if(src_len <= 0) return "";\n\n   ArrayResize(key,0);\n\n   int ret = CryptEncode(CRYPT_HASH_SHA256, src, key, res);\n   if(ret <= 0) return "";\n\n   return CharArrayToHex(res);\n}\n\nstring GetMachineID()\n{\n   string s = "";\n   s += "ACC:" + IntegerToString((int)AccountInfoInteger(ACCOUNT_LOGIN)) + ";";\n   s += "SRV:" + AccountInfoString(ACCOUNT_SERVER) + ";";\n   s += "COMP:" + TerminalInfoString(TERMINAL_COMPANY) + ";";\n   s += "DATA:" + TerminalInfoString(TERMINAL_DATA_PATH) + ";";\n   s += "COMMON:" + TerminalInfoString(TERMINAL_COMMONDATA_PATH) + ";";\n   return s;\n}\n\n`;
+        const helpers = `
+string CharArrayToHex(const uchar &arr[])
+{
+   string out = "";
+   int n = ArraySize(arr);
+   for(int i=0; i<n; i++)
+      out += StringFormat("%02X", arr[i]);
+   return out;
+}
+
+string SHA256_hex_from_string(const string s)
+{
+   uchar src[];
+   uchar key[];
+   uchar res[];
+
+   int src_len = StringToCharArray(s, src);
+   if(src_len <= 0) return "";
+
+   ArrayResize(key,0);
+
+   int ret = CryptEncode(CRYPT_HASH_SHA256, src, key, res);
+   if(ret <= 0) return "";
+
+   return CharArrayToHex(res);
+}
+
+string GetMachineID()
+{
+   string s = "";
+   s += "ACC:" + IntegerToString((int)AccountInfoInteger(ACCOUNT_LOGIN)) + ";";
+   s += "SRV:" + AccountInfoString(ACCOUNT_SERVER) + ";";
+   s += "COMP:" + TerminalInfoString(TERMINAL_COMPANY) + ";";
+   s += "DATA:" + TerminalInfoString(TERMINAL_DATA_PATH) + ";";
+   s += "COMMON:" + TerminalInfoString(TERMINAL_COMMONDATA_PATH) + ";";
+   return s;
+}
+`;
 
         const onInitPattern = /(^|\n)\s*int\s+OnInit\s*\(/;
         if (onInitPattern.test(patched)) {
-            patched = patched.replace(onInitPattern, '\n' + helpers + 'int OnInit(');
+            patched = patched.replace(onInitPattern, '\n' + helpers + '\nint OnInit(');
         } else {
-            errorDiv.textContent = 'Could not find int OnInit to insert helpers.';
+            errorDiv.textContent = 'Could not find int OnInit() in indicator.';
             return;
         }
 
@@ -73,6 +172,7 @@ document.getElementById('licenseForm').addEventListener('submit', function (e) {
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
+
     } catch (err) {
         errorDiv.textContent = 'Error: ' + (err?.message || err);
     }
@@ -81,22 +181,29 @@ document.getElementById('licenseForm').addEventListener('submit', function (e) {
 window.addEventListener('DOMContentLoaded', function () {
     const codeArea = document.getElementById('indicatorCode');
     const prefixInput = document.getElementById('prefix');
-    const daysLimitInput = document.getElementById('daysLimit');
+    const daysInput = document.getElementById('daysLimit');
+    const minutesInput = document.getElementById('minutesLimit');
 
     const savedCode = localStorage.getItem('indicatorCode');
     const savedPrefix = localStorage.getItem('prefix');
-    const savedDaysLimit = localStorage.getItem('daysLimit');
+    const savedDays = localStorage.getItem('daysLimit');
+    const savedMinutes = localStorage.getItem('minutesLimit');
+
     if (savedCode !== null) codeArea.value = savedCode;
     if (savedPrefix !== null) prefixInput.value = savedPrefix;
-    if (savedDaysLimit !== null) daysLimitInput.value = savedDaysLimit;
+    if (savedDays !== null) daysInput.value = savedDays;
+    if (savedMinutes !== null) minutesInput.value = savedMinutes;
 
-    codeArea.addEventListener('input', e => {
-        localStorage.setItem('indicatorCode', e.target.value);
-    });
-    prefixInput.addEventListener('input', e => {
-        localStorage.setItem('prefix', e.target.value);
-    });
-    daysLimitInput.addEventListener('input', e => {
-        localStorage.setItem('daysLimit', e.target.value);
-    });
+    codeArea.addEventListener('input', e =>
+        localStorage.setItem('indicatorCode', e.target.value)
+    );
+    prefixInput.addEventListener('input', e =>
+        localStorage.setItem('prefix', e.target.value)
+    );
+    daysInput.addEventListener('input', e =>
+        localStorage.setItem('daysLimit', e.target.value)
+    );
+    minutesInput.addEventListener('input', e =>
+        localStorage.setItem('minutesLimit', e.target.value)
+    );
 });
