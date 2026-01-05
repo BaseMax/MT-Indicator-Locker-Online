@@ -48,7 +48,7 @@ $('applyBtn').addEventListener('click', () => {
 
     /* ---- VALIDATION ---- */
     if (!prefix) {
-        errorDiv.textContent = 'Prefix cannot be empty.';
+       errorDiv.textContent = 'Prefix cannot be empty.';
         return;
     }
 
@@ -95,7 +95,9 @@ $('applyBtn').addEventListener('click', () => {
    string hash = SHA256_hex_from_string(raw);
    if(hash != "${key}")
    {
-      MessageBox("License key is invalid!", "License Error", MB_ICONERROR);
+      Comment("License not yet valid.");
+      Alert("License not yet valid.");
+      MessageBox("License not yet valid.", "License Error", MB_ICONERROR);
       return INIT_FAILED;
    }
 
@@ -103,11 +105,19 @@ $('applyBtn').addEventListener('click', () => {
    long totalSeconds = ${totalSeconds};
 
    datetime now = GetServerTime();
-   if(now < StringToTime(licenseStart))
+   if(now < StringToTime(licenseStart)) {
+      Comment("License expired.");
+      Alert("License expired.");
+      MessageBox("License expired.", "License Error", MB_ICONERROR);
       return INIT_FAILED;
+   }
 
-   if(now > StringToTime(licenseStart) + totalSeconds)
+   if(now > StringToTime(licenseStart) + totalSeconds) {
+      Comment("License key is invalid for this machine!");
+      Alert("License key is invalid for this machine!");
+      MessageBox("License key is invalid for this machine!", "License Error", MB_ICONERROR);
       return INIT_FAILED;
+   }
 `;
 
     const patched = code.replace(marker, licenseBlock);
