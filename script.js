@@ -1,26 +1,59 @@
-document.getElementById('licenseForm').addEventListener('submit', function (e) {
-    e.preventDefault();
+const $ = id => document.getElementById(id);
 
-    const prefix = document.getElementById('prefix').value.trim();
-    const daysRaw = document.getElementById('daysLimit').value.trim();
-    const minutesRaw = document.getElementById('minutesLimit').value.trim();
-    const key = document.getElementById('licenseKey').value.trim();
-    const codeArea = document.getElementById('indicatorCode');
-    const errorDiv = document.getElementById('error');
-    const code = codeArea.value;
+/* =======================
+   FIELDS TO PERSIST
+======================= */
+const fields = [
+    'indicatorCode',
+    'outputCode',
+    'prefix',
+    'daysLimit',
+    'minutesLimit',
+    'licenseKey'
+];
 
+/* =======================
+   LOAD / SAVE LOCALSTORAGE
+======================= */
+window.addEventListener('DOMContentLoaded', () => {
+    fields.forEach(id => {
+        const el = $(id);
+        if (!el) return;
+
+        const saved = localStorage.getItem(id);
+        if (saved !== null) el.value = saved;
+
+        el.addEventListener('input', () =>
+            localStorage.setItem(id, el.value)
+        );
+    });
+});
+
+/* =======================
+   APPLY LICENSE
+======================= */
+$('applyBtn').addEventListener('click', () => {
+    const errorDiv = $('error');
     errorDiv.textContent = '';
+
+    const prefix = $('prefix').value.trim();
+    const key = $('licenseKey').value.trim();
+    const code = $('indicatorCode').value;
+
+    const daysRaw = $('daysLimit').value.trim();
+    const minutesRaw = $('minutesLimit').value.trim();
 
     const days = daysRaw === '' ? 30 : parseInt(daysRaw, 10);
     const minutes = minutesRaw === '' ? 0 : parseInt(minutesRaw, 10);
 
-    localStorage.setItem('indicatorCode', code);
-    localStorage.setItem('prefix', prefix);
-    localStorage.setItem('daysLimit', days);
-    localStorage.setItem('minutesLimit', minutes);
-
+    /* ---- VALIDATION ---- */
     if (!prefix) {
         errorDiv.textContent = 'Prefix cannot be empty.';
+        return;
+    }
+
+    if (!/^[a-fA-F0-9]{64}$/.test(key)) {
+        errorDiv.textContent = 'License key must be a valid SHA256 hex string.';
         return;
     }
 
@@ -34,30 +67,8 @@ document.getElementById('licenseForm').addEventListener('submit', function (e) {
         return;
     }
 
-    if (days === 0 && minutes === 0) {
-        errorDiv.textContent = 'Days and minutes cannot both be zero.';
-        return;
-    }
-
-    if (days === 0 && minutes < 0) {
-        errorDiv.textContent = 'Minutes cannot be negative when days is zero.';
-        return;
-    }
-
-    const totalSeconds = (days * 86400) + (minutes * 60);
-
-    if (totalSeconds <= 0) {
-        errorDiv.textContent = 'Total license duration must be greater than zero.';
-        return;
-    }
-
-    if (!key) {
-        errorDiv.textContent = 'License key cannot be empty.';
-        return;
-    }
-
-    if (!/^[a-fA-F0-9]{64}$/.test(key)) {
-        errorDiv.textContent = 'License key must be a valid SHA256 hex string.';
+    if (days === 0 && minutes <= 0) {
+        errorDiv.textContent = 'Invalid license duration.';
         return;
     }
 
@@ -66,162 +77,74 @@ document.getElementById('licenseForm').addEventListener('submit', function (e) {
         return;
     }
 
-    try {
-        const marker =
-            /\/\/\/\/ \/\/\/\/ \/\/\/\/ \/\/\/\/ \/\/\/\/ MAXLICENSE \/\/\/\/ \/\/\/\/ \/\/\/\/ \/\/\/\//;
+    const marker =
+        /\/\/\/\/ \/\/\/\/ \/\/\/\/ \/\/\/\/ \/\/\/\/ MAXLICENSE \/\/\/\/ \/\/\/\/ \/\/\/\/ \/\/\/\//;
 
-        if (!marker.test(code)) {
-            errorDiv.textContent = 'License marker not found in indicator code.';
-            return;
-        }
+    if (!marker.test(code)) {
+        errorDiv.textContent = 'License marker not found in indicator code.';
+        return;
+    }
 
-        const today = new Date();
-        const startDate =
-            `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    /* ---- GENERATE LICENSE BLOCK ---- */
+    const totalSeconds = (days * 86400) + (minutes * 60);
+    const today = new Date().toISOString().slice(0, 10);
 
-        const timeCheck = `
-   // TIME LIMIT CHECK
-   string licenseStart = "${startDate}";
-   long totalSeconds = ${totalSeconds};
-
-   datetime dtStart = StringToTime(licenseStart);
-   /*
-   if(dtStart == 0)
-   {
-      MessageBox("License start date error.", "License Error", MB_ICONERROR);
-      return INIT_FAILED;
-   }
-   */
-
-   datetime now = GetServerTime();
-   if(now < dtStart)
-   {
-      Comment("License not yet valid.");
-      Alert("License not yet valid.");
-      MessageBox("License not yet valid.", "License Error", MB_ICONERROR);
-      return INIT_FAILED;
-   }
-
-   if(now > dtStart + totalSeconds)
-   {
-      Comment("License expired.");
-      Alert("License expired.");
-      MessageBox("License expired.", "License Error", MB_ICONERROR);
-      return INIT_FAILED;
-   }`;
-
-        const licenseBlock = `
+    const licenseBlock = `
    // LICENSE CHECK (injected by Max Online Locker Tool)
    string raw = "${prefix}" + GetMachineID();
    string hash = SHA256_hex_from_string(raw);
    if(hash != "${key}")
    {
-      Comment("License key is invalid for this machine!");
-      Alert("License key is invalid for this machine!");
-      MessageBox("License key is invalid for this machine!", "License Error", MB_ICONERROR);
+      MessageBox("License key is invalid!", "License Error", MB_ICONERROR);
       return INIT_FAILED;
-   }${timeCheck}
+   }
+
+   string licenseStart = "${today}";
+   long totalSeconds = ${totalSeconds};
+
+   datetime now = GetServerTime();
+   if(now < StringToTime(licenseStart))
+      return INIT_FAILED;
+
+   if(now > StringToTime(licenseStart) + totalSeconds)
+      return INIT_FAILED;
 `;
 
-        let patched = code.replace(marker, licenseBlock);
+    const patched = code.replace(marker, licenseBlock);
 
-        const helpers = `
-string CharArrayToHex(const uchar &arr[])
-{
-   string out = "";
-   int n = ArraySize(arr);
-   for(int i=0; i<n; i++)
-      out += StringFormat("%02X", arr[i]);
-   return out;
-}
-
-string SHA256_hex_from_string(const string s)
-{
-   uchar src[];
-   uchar key[];
-   uchar res[];
-
-   int src_len = StringToCharArray(s, src);
-   if(src_len <= 0) return "";
-
-   ArrayResize(key,0);
-
-   int ret = CryptEncode(CRYPT_HASH_SHA256, src, key, res);
-   if(ret <= 0) return "";
-
-   return CharArrayToHex(res);
-}
-
-string GetMachineID()
-{
-   string s = "";
-   s += "ACC:" + IntegerToString((int)AccountInfoInteger(ACCOUNT_LOGIN)) + ";";
-   s += "SRV:" + AccountInfoString(ACCOUNT_SERVER) + ";";
-   s += "COMP:" + TerminalInfoString(TERMINAL_COMPANY) + ";";
-   s += "DATA:" + TerminalInfoString(TERMINAL_DATA_PATH) + ";";
-   s += "COMMON:" + TerminalInfoString(TERMINAL_COMMONDATA_PATH) + ";";
-   return s;
-}
-
-datetime GetServerTime()
-{
-   return TimeCurrent();
-   /*
-   datetime t = TimeTradeServer();
-   if(t <= 0)
-      t = TimeCurrent();
-   return t;
-   */
-}
-`;
-
-        const onInitPattern = /(^|\n)\s*int\s+OnInit\s*\(/;
-        if (onInitPattern.test(patched)) {
-            patched = patched.replace(onInitPattern, '\n' + helpers + '\nint OnInit(');
-        } else {
-            errorDiv.textContent = 'Could not find int OnInit() in indicator.';
-            return;
-        }
-
-        const blob = new Blob([patched], { type: 'text/plain' });
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = 'Indicator.mq5';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-
-    } catch (err) {
-        errorDiv.textContent = 'Error: ' + (err?.message || err);
-    }
+    $('outputCode').value = patched;
+    localStorage.setItem('outputCode', patched);
 });
 
-window.addEventListener('DOMContentLoaded', function () {
-    const codeArea = document.getElementById('indicatorCode');
-    const prefixInput = document.getElementById('prefix');
-    const daysInput = document.getElementById('daysLimit');
-    const minutesInput = document.getElementById('minutesLimit');
+/* =======================
+   COPY OUTPUT
+======================= */
+$('copyBtn').addEventListener('click', async () => {
+    const out = $('outputCode').value;
+    if (!out) return;
+    await navigator.clipboard.writeText(out);
+});
 
-    const savedCode = localStorage.getItem('indicatorCode');
-    const savedPrefix = localStorage.getItem('prefix');
-    const savedDays = localStorage.getItem('daysLimit');
-    const savedMinutes = localStorage.getItem('minutesLimit');
+/* =======================
+   DOWNLOAD OUTPUT
+======================= */
+$('downloadBtn').addEventListener('click', () => {
+    const out = $('outputCode').value;
+    if (!out) return;
 
-    if (savedCode !== null) codeArea.value = savedCode;
-    if (savedPrefix !== null) prefixInput.value = savedPrefix;
-    if (savedDays !== null) daysInput.value = savedDays;
-    if (savedMinutes !== null) minutesInput.value = savedMinutes;
+    const blob = new Blob([out], { type: 'text/plain' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'Indicator.mq5';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+});
 
-    codeArea.addEventListener('input', e =>
-        localStorage.setItem('indicatorCode', e.target.value)
-    );
-    prefixInput.addEventListener('input', e =>
-        localStorage.setItem('prefix', e.target.value)
-    );
-    daysInput.addEventListener('input', e =>
-        localStorage.setItem('daysLimit', e.target.value)
-    );
-    minutesInput.addEventListener('input', e =>
-        localStorage.setItem('minutesLimit', e.target.value)
-    );
+/* =======================
+   CLEAR OUTPUT
+======================= */
+$('clearBtn').addEventListener('click', () => {
+    $('outputCode').value = '';
+    localStorage.removeItem('outputCode');
 });
