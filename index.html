@@ -21,29 +21,35 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="container">
-        <h1>MT Indicator Locker Online</h1>
-        <p style="margin-bottom:18px;font-size:15px;">Lock and protect your MetaTrader 5 (MT5) indicator with a SHA256 license key.<br>Open source on <a href="https://github.com/BaseMax/MT-Indicator-Locker-Online" target="_blank" rel="noopener">GitHub</a>.</p>
-        <h2>Enter Your License Key</h2>
-        <form id="licenseForm">
-            <input type="text" id="prefix" placeholder="Prefix (e.g. indicator name)" maxlength="32" style="margin-bottom:8px;" required />
-            <input
-              type="number"
-              id="daysLimit"
-              placeholder="Days (default: 30)"
-              style="margin-bottom:8px;"
-            />
-            <input
-              type="number"
-              id="minutesLimit"
-              placeholder="Minutes (default: 0)"
-              style="margin-bottom:8px;"
-            />
-            <input type="text" id="licenseKey" placeholder="Paste your SHA256 license key here" maxlength="64" required />
-            <textarea id="indicatorCode" placeholder="Paste your Indicator.mq5 code here" rows="16" style="width:100%;margin:16px 0 8px 0;"></textarea>
-            <button type="submit">Apply License</button>
+    <div class="app">
+        <!-- LEFT: OPTIONS -->
+        <aside class="panel options">
+            <h2>Options</h2>
+    
+            <input type="text" id="prefix" placeholder="Prefix" maxlength="32" />
+            <input type="number" id="daysLimit" placeholder="Days (default 30)" />
+            <input type="number" id="minutesLimit" placeholder="Minutes (default 0)" />
+            <input type="text" id="licenseKey" placeholder="SHA256 License Key" maxlength="64" />
+    
+            <button id="applyBtn">Apply License</button>
+            <button id="copyBtn" type="button">Copy Output</button>
+            <button id="downloadBtn" type="button">Download Output</button>
+            <button id="clearBtn" type="button" class="danger">Clear Output</button>
+    
             <div id="error" class="error"></div>
-        </form>
+        </aside>
+    
+        <!-- CENTER: INPUT -->
+        <section class="panel editor">
+            <h2>Input Indicator Code</h2>
+            <textarea id="indicatorCode" placeholder="Paste original Indicator.mq5 code here"></textarea>
+        </section>
+    
+        <!-- RIGHT: OUTPUT -->
+        <section class="panel editor output">
+            <h2>Final Output</h2>
+            <textarea id="outputCode" placeholder="Generated output will appear here" readonly></textarea>
+        </section>
     </div>
     <script src="script.js"></script>
 </body>
