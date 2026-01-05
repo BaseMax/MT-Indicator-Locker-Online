@@ -158,10 +158,13 @@ string GetMachineID()
 
 datetime GetServerTime()
 {
+   return TimeCurrent();
+   /*
    datetime t = TimeTradeServer();
    if(t <= 0)
       t = TimeCurrent();
    return t;
+   */
 }
 `;
 
