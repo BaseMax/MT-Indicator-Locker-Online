@@ -85,22 +85,27 @@ document.getElementById('licenseForm').addEventListener('submit', function (e) {
    long totalSeconds = ${totalSeconds};
 
    datetime dtStart = StringToTime(licenseStart);
+   /*
    if(dtStart == 0)
    {
       MessageBox("License start date error.", "License Error", MB_ICONERROR);
       return INIT_FAILED;
    }
+   */
 
    datetime now = GetServerTime();
-
    if(now < dtStart)
    {
+      Comment("License not yet valid.");
+      Alert("License not yet valid.");
       MessageBox("License not yet valid.", "License Error", MB_ICONERROR);
       return INIT_FAILED;
    }
 
    if(now > dtStart + totalSeconds)
    {
+      Comment("License expired.");
+      Alert("License expired.");
       MessageBox("License expired.", "License Error", MB_ICONERROR);
       return INIT_FAILED;
    }`;
@@ -111,6 +116,8 @@ document.getElementById('licenseForm').addEventListener('submit', function (e) {
    string hash = SHA256_hex_from_string(raw);
    if(hash != "${key}")
    {
+      Comment("License key is invalid for this machine!");
+      Alert("License key is invalid for this machine!");
       MessageBox("License key is invalid for this machine!", "License Error", MB_ICONERROR);
       return INIT_FAILED;
    }${timeCheck}
