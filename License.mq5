@@ -50,23 +50,10 @@ datetime GetServerTime()
    return t;
 }
 
-string GetServerDateString()
-{
-   datetime t = GetServerTime();
-   return TimeToString(t, TIME_DATE | TIME_SECONDS);
-}
-
-string GetLicenseSalt()
-{
-   datetime serverTime = GetServerTime();
-   string date = TimeToString(serverTime, TIME_DATE);
-   return date;
-}
-
 int OnInit()
 {
    string prefix = "";
-   string raw = prefix + GetMachineID() + ";" + GetLicenseSalt();
+   string raw = prefix + GetMachineID();
    string hash = SHA256_hex_from_string(raw);
 
    Alert("NDS - Your License Code: " + hash);
@@ -89,3 +76,4 @@ int OnCalculate(const int rates_total,
 {
    return(rates_total);
 }
+
